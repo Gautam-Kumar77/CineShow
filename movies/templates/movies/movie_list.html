@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cine Show - Premium Movie Catalog</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --card-bg: #1a1c22;
+            --primary: #f84464;
+            --primary-hover: #df2d4e;
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            --accent: #ffc107;
+            --glass-bg: rgba(26, 28, 34, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --card-border: rgba(255, 255, 255, 0.04);
+            --gradient-1: linear-gradient(135deg, #f84464, #1e1b4b);
+            --gradient-2: linear-gradient(135deg, #6366f1, #312e81);
+            --gradient-3: linear-gradient(135deg, #10b981, #064e3b);
+            --gradient-4: linear-gradient(135deg, #f59e0b, #78350f);
+            --gradient-5: linear-gradient(135deg, #ec4899, #500724);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 50px;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 15px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 30px;
+        }
+
+        /* Sidebar Filters */
+        .sidebar {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 24px;
+            height: fit-content;
+            position: sticky;
+            top: 90px;
+        }
+
+        .filter-section {
+            margin-bottom: 24px;
+        }
+
+        .filter-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .filter-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        /* Custom Scrollbar for Filters */
+        .filter-group::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .filter-group::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            font-size: 14px;
+            color: var(--text-muted);
+            transition: color 0.2s ease;
+        }
+
+        .filter-item:hover {
+            color: var(--text-main);
+        }
+
+        .filter-item input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+
+        .checkmark {
+            position: relative;
+            height: 18px;
+            width: 18px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            margin-right: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .filter-item:hover input~.checkmark {
+            border-color: var(--primary);
+        }
+
+        .filter-item input:checked~.checkmark {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none;
+        }
+
+        .filter-item input:checked~.checkmark:after {
+            display: block;
+        }
+
+        .filter-item .checkmark:after {
+            left: 5px;
+            top: 2px;
+            width: 5px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .filter-item input:checked~span {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        .count-badge {
+            margin-left: auto;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .filter-item input:checked~.count-badge {
+            background: rgba(248, 68, 100, 0.15);
+            color: var(--primary);
+        }
+
+        /* Top Bar */
+        .catalog-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .results-count {
+            font-size: 16px;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .results-count strong {
+            color: var(--text-main);
+        }
+
+        .sorting-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sort-label {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .sort-select {
+            background-color: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .sort-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(248, 68, 100, 0.2);
+        }
+
+        /* Clear Filters Link */
+        .clear-filters-btn {
+            display: inline-block;
+            margin-top: 15px;
+            font-size: 12px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .clear-filters-btn:hover {
+            color: var(--primary-hover);
+            text-decoration: underline;
+        }
+
+        /* Movie Grid */
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .movie-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .movie-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(248, 68, 100, 0.4);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .movie-poster {
+            height: 280px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .movie-poster-logo {
+            font-size: 48px;
+            opacity: 0.15;
+            margin-bottom: 15px;
+        }
+
+        .movie-poster-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .movie-rating-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background-color: rgba(15, 17, 21, 0.85);
+            backdrop-filter: blur(5px);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--accent);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .movie-year-badge {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background-color: rgba(15, 17, 21, 0.85);
+            backdrop-filter: blur(5px);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .movie-info {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex-grow: 1;
+        }
+
+        .movie-title {
+            font-size: 16px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-main);
+        }
+
+        .movie-meta-item {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: auto;
+        }
+
+        .tag {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-genre {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .tag-lang {
+            background-color: rgba(248, 68, 100, 0.08);
+            color: var(--primary);
+            border: 1px solid rgba(248, 68, 100, 0.15);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 30px;
+        }
+
+        .page-link {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .page-link:hover {
+            border-color: var(--primary);
+            color: var(--text-main);
+        }
+
+        .page-link.active {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: var(--text-main);
+        }
+
+        .page-link.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .page-info {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin: 0 10px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .empty-state-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* Gradient Posters mapping */
+        .grad-0 {
+            background: var(--gradient-1);
+        }
+
+        .grad-1 {
+            background: var(--gradient-2);
+        }
+
+        .grad-2 {
+            background: var(--gradient-3);
+        }
+
+        .grad-3 {
+            background: var(--gradient-4);
+        }
+
+        .grad-4 {
+            background: var(--gradient-5);
+        }
+
+        /* Responsive Layout */
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <a href="/" class="logo">
+            <i class="fa-solid fa-film"></i>
+            Cine <span>Show</span>
+        </a>
+        <div class="results-count">
+            Filtered Catalogue
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar filters -->
+        <aside class="sidebar">
+            <form id="filter-form" method="get" action="">
+                <!-- Preservation of Sort Parameter -->
+                <input type="hidden" name="sort" value="{{ sort_by }}">
+
+                <div class="filter-section">
+                    <div class="filter-title">
+                        Genres
+                        {% if selected_genres %}
+                        <i class="fa-solid fa-filter-circle-xmark" style="color: var(--primary); font-size: 12px;"></i>
+                        {% endif %}
+                    </div>
+                    <div class="filter-group">
+                        {% for genre in genres %}
+                        <label class="filter-item">
+                            {% if genre.name in selected_genres %}
+                                <input type="checkbox" name="genre" value="{{ genre.name }}" class="filter-checkbox" checked>
+                            {% else %}
+                                <input type="checkbox" name="genre" value="{{ genre.name }}" class="filter-checkbox">
+                            {% endif %}
+                            <span class="checkmark"></span>
+                            <span>{{ genre.name }}</span>
+                            <span class="count-badge">{{ genre.movie_count }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="filter-section"
+                    style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px;">
+                    <div class="filter-title">
+                        Languages
+                        {% if selected_languages %}
+                        <i class="fa-solid fa-filter-circle-xmark" style="color: var(--primary); font-size: 12px;"></i>
+                        {% endif %}
+                    </div>
+                    <div class="filter-group">
+                        {% for language in languages %}
+                        <label class="filter-item">
+                            {% if language.name in selected_languages %}
+                                <input type="checkbox" name="language" value="{{ language.name }}" class="filter-checkbox" checked>
+                            {% else %}
+                                <input type="checkbox" name="language" value="{{ language.name }}" class="filter-checkbox">
+                            {% endif %}
+                            <span class="checkmark"></span>
+                            <span>{{ language.name }}</span>
+                            <span class="count-badge">{{ language.movie_count }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if selected_genres or selected_languages %}
+                <a href="/" class="clear-filters-btn">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Reset All Filters
+                </a>
+                {% endif %}
+            </form>
+        </aside>
+
+        <!-- Movie Catalog Grid -->
+        <main>
+            <div class="catalog-header">
+                <div class="results-count">
+                    Showing <strong>{{ page_obj.start_index }}-{{ page_obj.end_index }}</strong> of <strong>{{
+                        total_movies }}</strong> movies
+                </div>
+
+                <div class="sorting-container">
+                    <span class="sort-label">Sort By:</span>
+                    <select class="sort-select" id="sort-selector">
+                        {% if sort_by == 'title' %}
+                            <option value="title" selected>Title (A-Z)</option>
+                        {% else %}
+                            <option value="title">Title (A-Z)</option>
+                        {% endif %}
+                        
+                        {% if sort_by == '-title' %}
+                            <option value="-title" selected>Title (Z-A)</option>
+                        {% else %}
+                            <option value="-title">Title (Z-A)</option>
+                        {% endif %}
+                        
+                        {% if sort_by == '-release_date' %}
+                            <option value="-release_date" selected>Newest First</option>
+                        {% else %}
+                            <option value="-release_date">Newest First</option>
+                        {% endif %}
+                        
+                        {% if sort_by == 'release_date' %}
+                            <option value="release_date" selected>Oldest First</option>
+                        {% else %}
+                            <option value="release_date">Oldest First</option>
+                        {% endif %}
+                        
+                        {% if sort_by == '-rating' %}
+                            <option value="-rating" selected>Rating (High to Low)</option>
+                        {% else %}
+                            <option value="-rating">Rating (High to Low)</option>
+                        {% endif %}
+                        
+                        {% if sort_by == 'rating' %}
+                            <option value="rating" selected>Rating (Low to High)</option>
+                        {% else %}
+                            <option value="rating">Rating (Low to High)</option>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="movie-grid">
+                {% for movie in page_obj %}
+                <div class="movie-card">
+                    <!-- Dynamically assign card gradient theme by cycling -->
+                    <div class="movie-poster {% cycle 'grad-0' 'grad-1' 'grad-2' 'grad-3' 'grad-4' %}">
+                        <i class="fa-solid fa-film movie-poster-logo"></i>
+                        <div class="movie-poster-title">{{ movie.title }}</div>
+                        <div class="movie-rating-badge">
+                            <i class="fa-solid fa-star"></i> {{ movie.rating|floatformat:1 }}
+                        </div>
+                        <div class="movie-year-badge">
+                            <i class="fa-solid fa-calendar-days"></i> {{ movie.release_date|date:"Y" }}
+                        </div>
+                    </div>
+                    <div class="movie-info">
+                        <div class="movie-title" title="{{ movie.title }}">{{ movie.title }}</div>
+                        <div class="movie-meta-item">
+                            <i class="fa-solid fa-clock"></i> Release Date: {{ movie.release_date|date:"M d, Y" }}
+                        </div>
+
+                        <div class="tag-container">
+                            <!-- Pre-fetched ManyToMany tags load with zero queries -->
+                            {% for g in movie.genres.all %}
+                            <span class="tag tag-genre">{{ g.name }}</span>
+                            {% endfor %}
+                            {% for l in movie.languages.all %}
+                            <span class="tag tag-lang">{{ l.name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-triangle-exclamation empty-state-icon"></i>
+                    <h3 class="empty-state-title">No movies found</h3>
+                    <p class="empty-state-desc">Try clearing or adjusting your filter settings.</p>
+                    <a href="/" class="clear-filters-btn" style="margin-top: 15px; font-size: 14px;">
+                        Clear All Filters
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination Controls -->
+            {% if page_obj.has_other_pages %}
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% if url_params %}&{{ url_params }}{% endif %}" class="page-link" title="First Page">
+                    <i class="fa-solid fa-angles-left"></i>
+                </a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if url_params %}&{{ url_params }}{% endif %}"
+                    class="page-link" title="Previous Page">
+                    <i class="fa-solid fa-angle-left"></i>
+                </a>
+                {% else %}
+                <a href="#" class="page-link disabled"><i class="fa-solid fa-angles-left"></i></a>
+                <a href="#" class="page-link disabled"><i class="fa-solid fa-angle-left"></i></a>
+                {% endif %}
+
+                <span class="page-info">
+                    Page <strong>{{ page_obj.number }}</strong> of {{ page_obj.paginator.num_pages }}
+                </span>
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if url_params %}&{{ url_params }}{% endif %}"
+                    class="page-link" title="Next Page">
+                    <i class="fa-solid fa-angle-right"></i>
+                </a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if url_params %}&{{ url_params }}{% endif %}"
+                    class="page-link" title="Last Page">
+                    <i class="fa-solid fa-angles-right"></i>
+                </a>
+                {% else %}
+                <a href="#" class="page-link disabled"><i class="fa-solid fa-angle-right"></i></a>
+                <a href="#" class="page-link disabled"><i class="fa-solid fa-angles-right"></i></a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        // Automatic form submission when checkboxes change
+        document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                document.getElementById('filter-form').submit();
+            });
+        });
+
+        // Sync and submit form when the sorting selector changes
+        const sortSelector = document.getElementById('sort-selector');
+        if (sortSelector) {
+            sortSelector.addEventListener('change', (e) => {
+                const form = document.getElementById('filter-form');
+
+                // Find or create hidden sort input
+                let sortInput = form.querySelector('input[name="sort"]');
+                if (!sortInput) {
+                    sortInput = document.createElement('input');
+                    sortInput.type = 'hidden';
+                    sortInput.name = 'sort';
+                    form.appendChild(sortInput);
+                }
+                sortInput.value = e.target.value;
+                form.submit();
+            });
+        }
+    </script>
+</body>
+
+</html>
