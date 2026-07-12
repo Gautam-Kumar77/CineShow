@@ -1,5 +1,4 @@
 # CineShow
-
 CineShow is a real-time movie booking website built using Python and Django. This project was developed as a clone of BookMyShow for an internship project.
 
 ## Tech Stack

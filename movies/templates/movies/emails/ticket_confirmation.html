@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your CineShow Ticket Confirmation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f1115;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: none;
+            -ms-text-size-adjust: none;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #1a1c22;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .header {
+            background-color: #f84464;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 1px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 25px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+        .ticket-box {
+            background: linear-gradient(135deg, #f84464, #1e1b4b);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .ticket-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+        .ticket-detail {
+            margin-bottom: 10px;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: space-between;
+        }
+        .ticket-detail strong {
+            color: #ffffff;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .details-table td {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 14px;
+            color: #9ca3af;
+        }
+        .details-table td.label {
+            font-weight: 600;
+            color: #ffffff;
+            width: 150px;
+        }
+        .details-table td.value {
+            text-align: right;
+            color: #ffffff;
+        }
+        .footer {
+            background-color: #0f1115;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #9ca3af;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .footer a {
+            color: #f84464;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0f1115; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <div class="container">
+                    <div class="header">
+                        <h1>CINE SHOW</h1>
+                    </div>
+                    <div class="content">
+                        <div class="greeting">Hi moviegoer!</div>
+                        <p style="color: #9ca3af; font-size: 15px; line-height: 1.6; margin-bottom: 30px;">
+                            Your booking has been successfully confirmed. Here is your ticket confirmation details. Show this at the counter to collect your physical ticket.
+                        </p>
+                        
+                        <div class="ticket-box">
+                            <div class="ticket-title">{{ movie_title }}</div>
+                            <div style="font-size: 14px; color: rgba(255, 255, 255, 0.8);">{{ theater_name }}</div>
+                            <div style="font-size: 14px; color: rgba(255, 255, 255, 0.8); margin-top: 5px;">{{ show_time }}</div>
+                        </div>
+
+                        <table class="details-table">
+                            <tr>
+                                <td class="label">Seat Numbers</td>
+                                <td class="value" style="font-weight: bold; color: #ffc107;">{{ seat_numbers }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Payment ID</td>
+                                <td class="value">{{ payment_id }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Theater Location</td>
+                                <td class="value">{{ theater_location }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Total Amount Paid</td>
+                                <td class="value" style="font-weight: bold; color: #10b981;">${{ total_amount }}</td>
+                            </tr>
+                        </table>
+
+                        <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; text-align: center; margin-top: 40px;">
+                            Thank you for booking with CineShow! Enjoy your movie.
+                        </p>
+                    </div>
+                    <div class="footer">
+                        <p>&copy; 2026 CineShow. All rights reserved.</p>
+                        <p>If you have any questions, please contact our support at <a href="mailto:support@cineshow.com">support@cineshow.com</a></p>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
