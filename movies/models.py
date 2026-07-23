@@ -1,4 +1,21 @@
+import re
+from django.core.exceptions import ValidationError
 from django.db import models
+
+def extract_youtube_id(url):
+    if not url:
+        return None
+    # Supports www.youtube.com, m.youtube.com, youtube.com, youtu.be, embed, v, shorts, and query params
+    pattern = r'(?:https?://)?(?:www\.|m\.)?(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|v/|shorts/)|youtu\.be/)([\w-]{11})'
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    return None
+
+def validate_youtube_url(value):
+    if value:
+        if not extract_youtube_id(value):
+            raise ValidationError("Please enter a valid YouTube URL.")
 
 class Genre(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -16,6 +33,7 @@ class Movie(models.Model):
     title = models.CharField(max_length=255, db_index=True)
     release_date = models.DateField(db_index=True)
     rating = models.FloatField(db_index=True)
+    trailer_url = models.URLField(max_length=500, blank=True, null=True, validators=[validate_youtube_url])
 
     genres = models.ManyToManyField(Genre)
     languages = models.ManyToManyField(Language)

@@ -227,3 +227,16 @@ def retry_email_api(request, task_id):
     
     return JsonResponse({'status': 'success', 'message': 'Task rescheduled successfully'})
 
+def movie_detail(request, movie_id):
+    movie = get_object_or_404(Movie, id=movie_id)
+    
+    from .models import extract_youtube_id
+    video_id = extract_youtube_id(movie.trailer_url)
+    
+    context = {
+        'movie': movie,
+        'video_id': video_id,
+        'has_trailer': bool(video_id),
+    }
+    return render(request, 'movies/movie_detail.html', context)
+

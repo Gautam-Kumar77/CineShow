@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cine Show - Premium Movie Catalog</title>
+    <title>CineShow - Premium Movie Catalog</title>
     <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -769,8 +769,7 @@
         <main>
             <div class="catalog-header">
                 <div class="results-count">
-                    Showing <strong>{{ page_obj.start_index }}-{{ page_obj.end_index }}</strong> of <strong>{{
-                        total_movies }}</strong> movies
+                    Showing <strong>{{ page_obj.start_index }}-{{ page_obj.end_index }}</strong> of <strong>{{ total_movies }}</strong> movies
                 </div>
 
                 <div class="sorting-container">
@@ -819,18 +818,22 @@
                 {% for movie in page_obj %}
                 <div class="movie-card">
                     <!-- Dynamically assign card gradient theme by cycling -->
-                    <div class="movie-poster {% cycle 'grad-0' 'grad-1' 'grad-2' 'grad-3' 'grad-4' %}">
-                        <i class="fa-solid fa-film movie-poster-logo"></i>
-                        <div class="movie-poster-title">{{ movie.title }}</div>
-                        <div class="movie-rating-badge">
-                            <i class="fa-solid fa-star"></i> {{ movie.rating|floatformat:1 }}
+                    <a href="{% url 'movie_detail' movie.id %}" style="text-decoration: none; color: inherit; display: block;">
+                        <div class="movie-poster {% cycle 'grad-0' 'grad-1' 'grad-2' 'grad-3' 'grad-4' %}">
+                            <i class="fa-solid fa-film movie-poster-logo"></i>
+                            <div class="movie-poster-title">{{ movie.title }}</div>
+                            <div class="movie-rating-badge">
+                                <i class="fa-solid fa-star"></i> {{ movie.rating|floatformat:1 }}
+                            </div>
+                            <div class="movie-year-badge">
+                                <i class="fa-solid fa-calendar-days"></i> {{ movie.release_date|date:"Y" }}
+                            </div>
                         </div>
-                        <div class="movie-year-badge">
-                            <i class="fa-solid fa-calendar-days"></i> {{ movie.release_date|date:"Y" }}
-                        </div>
-                    </div>
+                    </a>
                     <div class="movie-info">
-                        <div class="movie-title" title="{{ movie.title }}">{{ movie.title }}</div>
+                        <a href="{% url 'movie_detail' movie.id %}" style="text-decoration: none; color: inherit; display: block; overflow: hidden;">
+                            <div class="movie-title" title="{{ movie.title }}">{{ movie.title }}</div>
+                        </a>
                         <div class="movie-meta-item">
                             <i class="fa-solid fa-clock"></i> Release Date: {{ movie.release_date|date:"M d, Y" }}
                         </div>

@@ -38,17 +38,29 @@ class Command(BaseCommand):
         movies_to_create = []
         start_date = date(2000, 1, 1)
 
+        sample_trailers = [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=Ke1Y3q1XjUU",
+            "https://www.youtube.com/watch?v=tgbNymZ7vqY",
+            "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+            "https://www.youtube.com/watch?v=Bey4XXJAqS8",
+            None,
+        ]
+
         for i in range(1, 5001):
             title = f"{random.choice(adjectives)} {random.choice(nouns)} {i}"
             # Random date between year 2000 and 2026
             release_date = start_date + timedelta(days=random.randint(0, 9500))
             # Rating between 1.0 and 10.0
             rating = round(random.uniform(1.0, 10.0), 1)
+            trailer = random.choice(sample_trailers)
             
             movies_to_create.append(Movie(
                 title=title,
                 release_date=release_date,
-                rating=rating
+                rating=rating,
+                trailer_url=trailer
             ))
 
         self.stdout.write("Bulk inserting movies (5,000 records)...")

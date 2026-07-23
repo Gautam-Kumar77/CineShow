@@ -68,7 +68,7 @@ class BookingEmailTestCase(TestCase):
         task.refresh_from_db()
         self.assertEqual(task.status, 'SENT')
         self.assertEqual(task.retry_count, 1)
-        self.assertNil = task.last_error
+        self.assertIsNone(task.last_error)
         
         # Verify email is sent and received in django test mail outbox
         self.assertEqual(len(mail.outbox), 1)
@@ -103,3 +103,62 @@ class BookingEmailTestCase(TestCase):
         self.assertEqual(task.status, 'FAILED')
         self.assertEqual(task.retry_count, 1)
         self.assertIn("SMTP Connection Timeout", task.last_error)
+
+
+class TrailerEmbeddingTestCase(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.movie_with_trailer = Movie.objects.create(
+            title="Inception",
+            release_date="2010-07-16",
+            rating=8.8,
+            trailer_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        )
+        self.movie_without_trailer = Movie.objects.create(
+            title="Interstellar",
+            release_date="2014-11-07",
+            rating=8.6,
+            trailer_url=""
+        )
+
+    def test_youtube_id_extraction(self):
+        from movies.models import extract_youtube_id
+        # Valid URLs
+        self.assertEqual(extract_youtube_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_id("https://youtu.be/dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_id("https://youtube.com/embed/dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_id("https://m.youtube.com/watch?v=dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        self.assertEqual(extract_youtube_id("https://youtube.com/shorts/dQw4w9WgXcQ"), "dQw4w9WgXcQ")
+        
+        # Invalid URLs
+        self.assertIsNone(extract_youtube_id("https://google.com/watch?v=dQw4w9WgXcQ"))
+        self.assertIsNone(extract_youtube_id("malicious_script_injection_here"))
+
+    def test_movie_validation(self):
+        from django.core.exceptions import ValidationError
+        # Valid trailer url doesn't raise error
+        self.movie_with_trailer.full_clean()
+        
+        # Invalid trailer url raises ValidationError
+        movie = Movie(
+            title="Bad Trailer Link",
+            release_date="2020-01-01",
+            rating=5.0,
+            trailer_url="https://notyoutube.com/watch?v=123"
+        )
+        with self.assertRaises(ValidationError):
+            movie.full_clean()
+
+    def test_movie_detail_view(self):
+        # Movie with trailer
+        response = self.client.get(reverse('movie_detail', args=[self.movie_with_trailer.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['has_trailer'], True)
+        self.assertEqual(response.context['video_id'], "dQw4w9WgXcQ")
+        self.assertContains(response, "dQw4w9WgXcQ")
+        
+        # Movie without trailer
+        response = self.client.get(reverse('movie_detail', args=[self.movie_without_trailer.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['has_trailer'], False)
+        self.assertContains(response, "Official trailer is not available")
