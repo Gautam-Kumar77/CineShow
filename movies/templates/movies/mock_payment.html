@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Stripe Checkout - CineShow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f6f9fc;
+            color: #32325d;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 15px 35px rgba(50,50,93,.1), 0 5px 15px rgba(0,0,0,.07);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 24px;
+            font-weight: 700;
+            color: #6772e5;
+            margin-bottom: 20px;
+        }
+        .details {
+            text-align: left;
+            margin-bottom: 30px;
+            font-size: 15px;
+            color: #525f7f;
+            line-height: 1.6;
+        }
+        .details strong {
+            color: #32325d;
+        }
+        .amount {
+            font-size: 32px;
+            font-weight: 600;
+            color: #32325d;
+            margin: 20px 0;
+        }
+        .btn {
+            background-color: #6772e5;
+            color: white;
+            border: none;
+            padding: 15px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 6px rgba(50,50,93,.11), 0 1px 3px rgba(0,0,0,.08);
+            font-family: inherit;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 7px 14px rgba(50,50,93,.1), 0 3px 6px rgba(0,0,0,.08);
+            background-color: #5469d4;
+        }
+        .btn-cancel {
+            background-color: transparent;
+            color: #525f7f;
+            box-shadow: none;
+            margin-top: 15px;
+        }
+        .btn-cancel:hover {
+            background-color: transparent;
+            box-shadow: none;
+            color: #32325d;
+            text-decoration: underline;
+        }
+        .notice {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #8898aa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fa-brands fa-stripe"></i> Test Mode Checkout
+        </div>
+        
+        <div class="details">
+            <div><strong>Movie:</strong> {{ booking.show.movie.title }}</div>
+            <div><strong>Seats:</strong> {{ booking.seat_numbers }}</div>
+            <div><strong>Email:</strong> {{ booking.email }}</div>
+        </div>
+        
+        <div class="amount">
+            ₹{{ booking.total_amount }}
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <button type="submit" class="btn">Pay ₹{{ booking.total_amount }} (Simulate Success)</button>
+        </form>
+        
+        <a href="/payment/cancel/" class="btn btn-cancel" style="display: block; text-decoration: none;">Cancel Payment</a>
+        
+        <div class="notice">
+            <i class="fa-solid fa-info-circle"></i> This is a mock checkout page because a dummy Stripe API key is currently being used for local development.
+        </div>
+    </div>
+</body>
+</html>

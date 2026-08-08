@@ -61,7 +61,15 @@ class Booking(models.Model):
     show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='bookings')
     email = models.EmailField(db_index=True)
     seat_numbers = models.CharField(max_length=255) # e.g. "A1, A2, A3"
-    payment_id = models.CharField(max_length=100, unique=True)
+    
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('SUCCESS', 'Success'),
+        ('FAILED', 'Failed'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', db_index=True)
+    payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    stripe_checkout_session_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -89,3 +97,10 @@ class EmailTask(models.Model):
     def __str__(self):
         return f"Email to {self.recipient} - {self.status} (Retries: {self.retry_count})"
 
+class StripeEvent(models.Model):
+    event_id = models.CharField(max_length=255, unique=True, primary_key=True)
+    event_type = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.event_type} - {self.event_id}"

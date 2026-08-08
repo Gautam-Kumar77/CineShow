@@ -1,13 +1,17 @@
 import time
 import json
-from django.shortcuts import render, get_object_or_404
+import stripe
+from django.conf import settings
+from django.shortcuts import render, get_object_or_404, redirect
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Genre, Language, Movie, Theater, Show, Booking, EmailTask
+from .models import Genre, Language, Movie, Theater, Show, Booking, EmailTask, StripeEvent
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def populate_initial_data():
     if Theater.objects.exists() and Show.objects.exists():
@@ -146,7 +150,6 @@ def booking_api(request):
         show_id = data.get('show_id')
         email = data.get('email')
         seats = data.get('seats')
-        payment_id = data.get('payment_id') or f"PAY-{int(time.time()*1000)}"
         
         if not show_id or not email or not seats:
             return JsonResponse({'status': 'error', 'message': 'Missing required fields'}, status=400)
@@ -155,43 +158,169 @@ def booking_api(request):
         num_seats = len([s.strip() for s in seats.split(',') if s.strip()])
         total_amount = show.price * num_seats
         
+        # Create pending booking
         booking = Booking.objects.create(
             show=show,
             email=email,
             seat_numbers=seats,
-            payment_id=payment_id,
-            total_amount=total_amount
+            total_amount=total_amount,
+            status='PENDING'
         )
         
-        # Enqueue Email
-        from .email_queue import enqueue_email
-        context_data = {
-            'movie_title': show.movie.title,
-            'theater_name': show.theater.name,
-            'show_time': show.show_time.strftime("%A, %b %d at %I:%M %p"),
-            'seat_numbers': seats,
-            'payment_id': payment_id,
-            'theater_location': show.theater.location,
-            'total_amount': f"{total_amount:.2f}"
-        }
-        
-        enqueue_email(
-            booking=booking,
-            recipient=email,
-            subject=f"CineShow Ticket Confirmation - {show.movie.title}",
-            template_name="movies/emails/ticket_confirmation.html",
-            context_data=context_data
-        )
+        try:
+            # Create Stripe Checkout Session
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card', 'upi'],
+                line_items=[
+                    {
+                        'price_data': {
+                            'currency': 'inr',
+                            'unit_amount': int(show.price * 100),
+                            'product_data': {
+                                'name': f"{show.movie.title} Ticket(s)",
+                                'description': f"{show.theater.name} - {show.show_time.strftime('%b %d, %I:%M %p')}",
+                            },
+                        },
+                        'quantity': num_seats,
+                    },
+                ],
+                mode='payment',
+                client_reference_id=str(booking.id),
+                customer_email=email,
+                success_url=settings.DOMAIN_URL + '/payment/success/',
+                cancel_url=settings.DOMAIN_URL + '/payment/cancel/',
+                metadata={
+                    'booking_id': booking.id,
+                }
+            )
+            
+            # Save session id to booking
+            booking.stripe_checkout_session_id = checkout_session.id
+            booking.save()
+            checkout_url = checkout_session.url
+        except stripe.error.AuthenticationError:
+            # Fallback to mock checkout if API key is invalid (dummy key)
+            booking.stripe_checkout_session_id = f"mock_session_{booking.id}"
+            booking.save()
+            checkout_url = f"/mock-payment/{booking.id}/"
         
         return JsonResponse({
             'status': 'success', 
-            'booking_id': booking.id, 
-            'message': 'Booking confirmed! Confirmation email queued.'
+            'checkout_url': checkout_url,
+            'message': 'Redirecting to payment gateway...'
         })
     except Show.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Show not found'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+def stripe_webhook_api(request):
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    event = None
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError as e:
+        # Invalid payload
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return HttpResponse(status=400)
+
+    # Idempotency check
+    if StripeEvent.objects.filter(event_id=event.id).exists():
+        # Event already processed, return 200 to acknowledge
+        return HttpResponse(status=200)
+
+    # Store event for idempotency
+    StripeEvent.objects.create(event_id=event.id, event_type=event.type)
+
+    if event.type == 'checkout.session.completed':
+        session = event.data.object
+        booking_id = session.client_reference_id
+        
+        try:
+            booking = Booking.objects.get(id=booking_id)
+            if booking.status != 'SUCCESS':
+                booking.status = 'SUCCESS'
+                # Use payment intent or session id as our payment_id
+                booking.payment_id = session.payment_intent or session.id
+                booking.save()
+                
+                # Enqueue Email
+                from .email_queue import enqueue_email
+                context_data = {
+                    'movie_title': booking.show.movie.title,
+                    'theater_name': booking.show.theater.name,
+                    'show_time': booking.show.show_time.strftime("%A, %b %d at %I:%M %p"),
+                    'seat_numbers': booking.seat_numbers,
+                    'payment_id': booking.payment_id,
+                    'theater_location': booking.show.theater.location,
+                    'total_amount': f"{booking.total_amount:.2f}"
+                }
+                
+                enqueue_email(
+                    booking=booking,
+                    recipient=booking.email,
+                    subject=f"CineShow Ticket Confirmation - {booking.show.movie.title}",
+                    template_name="movies/emails/ticket_confirmation.html",
+                    context_data=context_data
+                )
+        except Booking.DoesNotExist:
+            pass
+
+    elif event.type in ['checkout.session.expired', 'checkout.session.async_payment_failed']:
+        session = event.data.object
+        booking_id = session.client_reference_id
+        try:
+            booking = Booking.objects.get(id=booking_id)
+            if booking.status == 'PENDING':
+                booking.status = 'FAILED'
+                booking.save()
+        except Booking.DoesNotExist:
+            pass
+
+    return HttpResponse(status=200)
+
+def payment_success(request):
+    return render(request, 'movies/payment_success.html')
+
+def payment_cancel(request):
+    return render(request, 'movies/payment_cancel.html')
+
+def mock_payment(request, booking_id):
+    booking = get_object_or_404(Booking, id=booking_id)
+    if request.method == 'POST':
+        # Simulate webhook success
+        if booking.status != 'SUCCESS':
+            booking.status = 'SUCCESS'
+            booking.payment_id = f"pi_mock_{booking.id}"
+            booking.save()
+            
+            from .email_queue import enqueue_email
+            context_data = {
+                'movie_title': booking.show.movie.title,
+                'theater_name': booking.show.theater.name,
+                'show_time': booking.show.show_time.strftime("%A, %b %d at %I:%M %p"),
+                'seat_numbers': booking.seat_numbers,
+                'payment_id': booking.payment_id,
+                'theater_location': booking.show.theater.location,
+                'total_amount': f"{booking.total_amount:.2f}"
+            }
+            enqueue_email(
+                booking=booking,
+                recipient=booking.email,
+                subject=f"CineShow Ticket Confirmation - {booking.show.movie.title}",
+                template_name="movies/emails/ticket_confirmation.html",
+                context_data=context_data
+            )
+        return redirect('/payment/success/')
+        
+    return render(request, 'movies/mock_payment.html', {'booking': booking})
 
 def email_dashboard(request):
     # Stats

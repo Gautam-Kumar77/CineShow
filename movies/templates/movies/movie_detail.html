@@ -657,9 +657,9 @@
 
                     <div class="booking-summary-box">
                         <div>Seats: <span id="summary-seats" style="font-weight: 600; color: var(--accent);">-</span></div>
-                        <div>Price per seat: $<span id="summary-price">-</span></div>
+                        <div>Price per seat: ₹<span id="summary-price">-</span></div>
                         <div style="font-size: 18px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; font-weight: 700;">
-                            Total: $<span id="summary-total">0.00</span>
+                            Total: ₹<span id="summary-total">0.00</span>
                         </div>
                     </div>
 
@@ -744,7 +744,7 @@
                     showsDataList.forEach(show => {
                         const opt = document.createElement('option');
                         opt.value = show.id;
-                        opt.innerText = `${show.theater_name} - ${show.show_time} ($${show.price.toFixed(2)})`;
+                        opt.innerText = `${show.theater_name} - ${show.show_time} (₹${show.price.toFixed(2)})`;
                         showSelect.appendChild(opt);
                     });
                 })
@@ -843,9 +843,8 @@
             })
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'success') {
-                    closeBookingModal();
-                    document.getElementById('success-modal').style.display = 'flex';
+                if (data.status === 'success' && data.checkout_url) {
+                    window.location.href = data.checkout_url;
                 } else {
                     alert('Booking failed: ' + data.message);
                 }
