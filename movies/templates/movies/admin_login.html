@@ -50,6 +50,23 @@
             animation: fadeIn 0.4s ease;
         }
 
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+            .login-card {
+                padding: 24px 20px;
+                border-radius: 16px;
+            }
+            .brand-logo {
+                font-size: 24px;
+            }
+            .btn-submit {
+                padding: 13px;
+                font-size: 15px;
+            }
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-15px); }
             to { opacity: 1; transform: translateY(0); }

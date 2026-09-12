@@ -506,14 +506,134 @@
             background: var(--gradient-5);
         }
 
-        /* Responsive Layout */
+        /* Mobile Filter Toggle Button */
+        .mobile-filter-btn {
+            display: none;
+            width: 100%;
+            background-color: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .mobile-filter-btn:hover {
+            border-color: var(--primary);
+        }
+
+        /* Comprehensive Multi-Device Breakpoints */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 260px 1fr;
+                gap: 20px;
+            }
+            .movie-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 18px;
+            }
+        }
+
         @media (max-width: 900px) {
             .container {
                 grid-template-columns: 1fr;
+                margin: 15px auto;
+                padding: 0 15px;
+            }
+
+            .mobile-filter-btn {
+                display: flex;
             }
 
             .sidebar {
                 position: static;
+                display: none;
+                margin-bottom: 20px;
+                animation: slideDown 0.3s ease;
+            }
+
+            .sidebar.mobile-open {
+                display: block;
+            }
+
+            @keyframes slideDown {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            .movie-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+            }
+
+            .catalog-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .sorting-container {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .sort-select {
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 550px) {
+            header {
+                padding: 12px 16px;
+            }
+
+            .logo {
+                font-size: 20px;
+            }
+
+            .movie-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .movie-poster {
+                height: 200px;
+                padding: 12px;
+            }
+
+            .movie-poster-logo {
+                font-size: 36px;
+                margin-bottom: 8px;
+            }
+
+            .movie-poster-title {
+                font-size: 15px;
+            }
+
+            .movie-info {
+                padding: 12px;
+            }
+
+            .movie-title {
+                font-size: 14px;
+            }
+
+            .page-link {
+                min-width: 36px;
+                height: 36px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .movie-grid {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -704,8 +824,14 @@
     </header>
 
     <div class="container">
+        <!-- Mobile Filter Toggle Button -->
+        <button class="mobile-filter-btn" id="mobile-filter-toggle" onclick="toggleMobileFilters()">
+            <span><i class="fa-solid fa-sliders"></i> Filter Movies</span>
+            <i class="fa-solid fa-chevron-down" id="filter-chevron"></i>
+        </button>
+
         <!-- Sidebar filters -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="movie-sidebar">
             <form id="filter-form" method="get" action="">
                 <!-- Preservation of Sort Parameter -->
                 <input type="hidden" name="sort" value="{{ sort_by }}">
@@ -903,6 +1029,18 @@
     </div>
 
     <script>
+        function toggleMobileFilters() {
+            const sidebar = document.getElementById('movie-sidebar');
+            const chevron = document.getElementById('filter-chevron');
+            if (sidebar) {
+                sidebar.classList.toggle('mobile-open');
+                if (chevron) {
+                    chevron.classList.toggle('fa-chevron-down');
+                    chevron.classList.toggle('fa-chevron-up');
+                }
+            }
+        }
+
         // Automatic form submission when checkboxes change
         document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
             checkbox.addEventListener('change', () => {
