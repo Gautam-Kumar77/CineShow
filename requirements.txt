@@ -1,3 +1,5 @@
 django>=5.0
 stripe>=7.0.0
 python-dotenv
+gunicorn>=21.2.0
+whitenoise>=6.6.0
