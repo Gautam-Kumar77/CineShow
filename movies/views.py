@@ -17,34 +17,37 @@ from .analytics import get_admin_analytics_data
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def populate_initial_data():
-    if Theater.objects.exists() and Show.objects.exists():
-        return
-    
-    # Create some theaters if they don't exist
-    t1, _ = Theater.objects.get_or_create(name="PVR IMAX", location="Forum Mall, Koramangala")
-    t2, _ = Theater.objects.get_or_create(name="Cinepolis Premium", location="Royal Meenakshi Mall")
-    t3, _ = Theater.objects.get_or_create(name="Inox Gold Class", location="Mantri Square Mall")
+    try:
+        if Theater.objects.exists() and Show.objects.exists():
+            return
+        
+        # Create some theaters if they don't exist
+        t1, _ = Theater.objects.get_or_create(name="PVR IMAX", location="Forum Mall, Koramangala")
+        t2, _ = Theater.objects.get_or_create(name="Cinepolis Premium", location="Royal Meenakshi Mall")
+        t3, _ = Theater.objects.get_or_create(name="Inox Gold Class", location="Mantri Square Mall")
 
-    # Create shows for all movies
-    movies = Movie.objects.all()
-    now = timezone.now()
-    
-    for movie in movies:
-        # Show 1: Today 3 PM
-        show_time_1 = now.replace(hour=15, minute=0, second=0, microsecond=0)
-        if show_time_1 < now:
-            show_time_1 += timedelta(days=1)
-        Show.objects.get_or_create(movie=movie, theater=t1, show_time=show_time_1, price=12.50)
+        # Create shows for all movies
+        movies = Movie.objects.all()
+        now = timezone.now()
+        
+        for movie in movies:
+            # Show 1: Today 3 PM
+            show_time_1 = now.replace(hour=15, minute=0, second=0, microsecond=0)
+            if show_time_1 < now:
+                show_time_1 += timedelta(days=1)
+            Show.objects.get_or_create(movie=movie, theater=t1, show_time=show_time_1, price=12.50)
 
-        # Show 2: Today 7 PM
-        show_time_2 = now.replace(hour=19, minute=0, second=0, microsecond=0)
-        if show_time_2 < now:
-            show_time_2 += timedelta(days=1)
-        Show.objects.get_or_create(movie=movie, theater=t2, show_time=show_time_2, price=15.00)
+            # Show 2: Today 7 PM
+            show_time_2 = now.replace(hour=19, minute=0, second=0, microsecond=0)
+            if show_time_2 < now:
+                show_time_2 += timedelta(days=1)
+            Show.objects.get_or_create(movie=movie, theater=t2, show_time=show_time_2, price=15.00)
 
-        # Show 3: Tomorrow 9:30 PM
-        show_time_3 = (now + timedelta(days=1)).replace(hour=21, minute=30, second=0, microsecond=0)
-        Show.objects.get_or_create(movie=movie, theater=t3, show_time=show_time_3, price=18.50)
+            # Show 3: Tomorrow 9:30 PM
+            show_time_3 = (now + timedelta(days=1)).replace(hour=21, minute=30, second=0, microsecond=0)
+            Show.objects.get_or_create(movie=movie, theater=t3, show_time=show_time_3, price=18.50)
+    except Exception:
+        pass
 
 def movie_list(request):
     # Populate initial theaters and shows
