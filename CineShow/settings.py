@@ -38,7 +38,7 @@ ROOT_URLCONF = 'CineShow.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'movies' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -63,9 +63,9 @@ if os.environ.get('VERCEL') or not os.access(BASE_DIR, os.W_OK):
             shutil.copy2(orig_db, tmp_db)
         except Exception:
             pass
-    DB_PATH = tmp_db if tmp_db.exists() else orig_db
+    DB_PATH = str(tmp_db)
 else:
-    DB_PATH = BASE_DIR / 'db.sqlite3'
+    DB_PATH = str(BASE_DIR / 'db.sqlite3')
 
 DATABASES = {
     'default': {
