@@ -9,7 +9,10 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from datetime import datetime, timedelta
-from .models import Genre, Language, Movie, Theater, Show, Booking, EmailTask, StripeEvent
+from django.contrib.auth import authenticate, login, logout
+from .models import Genre, Language, Movie, Theater, Show, Booking, EmailTask, StripeEvent, SeatLock
+from .seat_lock_manager import get_seats_status, lock_seats, release_seats, convert_locks_to_booking, SeatConflictError
+from .analytics import get_admin_analytics_data
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -140,6 +143,49 @@ def get_shows_api(request, movie_id):
         })
     return JsonResponse({'shows': shows_data})
 
+def get_seats_status_api(request, show_id):
+    session_id = request.GET.get('session_id', '')
+    try:
+        seats_data = get_seats_status(show_id, session_id=session_id)
+        return JsonResponse({'status': 'success', 'seats': seats_data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+def lock_seats_api(request, show_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST method is allowed'}, status=405)
+    try:
+        data = json.loads(request.body)
+        seats = data.get('seats', [])
+        session_id = data.get('session_id')
+        if not seats or not session_id:
+            return JsonResponse({'status': 'error', 'message': 'Seats and session_id are required'}, status=400)
+        
+        result = lock_seats(show_id, seats, session_id)
+        return JsonResponse({'status': 'success', 'data': result})
+    except SeatConflictError as e:
+        return JsonResponse({
+            'status': 'conflict',
+            'message': str(e),
+            'conflicting_seats': e.conflicting_seats
+        }, status=409)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+def release_seats_api(request, show_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST method is allowed'}, status=405)
+    try:
+        data = json.loads(request.body)
+        seats = data.get('seats', [])
+        session_id = data.get('session_id')
+        released_count = release_seats(show_id, seats, session_id)
+        return JsonResponse({'status': 'success', 'released_count': released_count})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 @csrf_exempt
 def booking_api(request):
     if request.method != 'POST':
@@ -150,13 +196,26 @@ def booking_api(request):
         show_id = data.get('show_id')
         email = data.get('email')
         seats = data.get('seats')
+        session_id = data.get('session_id')
         
         if not show_id or not email or not seats:
             return JsonResponse({'status': 'error', 'message': 'Missing required fields'}, status=400)
             
         show = Show.objects.get(id=show_id)
-        num_seats = len([s.strip() for s in seats.split(',') if s.strip()])
+        seat_list = [s.strip() for s in seats.split(',') if s.strip()]
+        num_seats = len(seat_list)
         total_amount = show.price * num_seats
+
+        # Concurrency safety: Atomically verify or acquire seat lock
+        if session_id:
+            try:
+                lock_seats(show_id, seat_list, session_id)
+            except SeatConflictError as e:
+                return JsonResponse({
+                    'status': 'conflict',
+                    'message': str(e),
+                    'conflicting_seats': e.conflicting_seats
+                }, status=409)
         
         # Create pending booking
         booking = Booking.objects.create(
@@ -168,38 +227,44 @@ def booking_api(request):
         )
         
         try:
-            # Create Stripe Checkout Session
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card', 'upi'],
-                line_items=[
-                    {
-                        'price_data': {
-                            'currency': 'inr',
-                            'unit_amount': int(show.price * 100),
-                            'product_data': {
-                                'name': f"{show.movie.title} Ticket(s)",
-                                'description': f"{show.theater.name} - {show.show_time.strftime('%b %d, %I:%M %p')}",
+            stripe_key = getattr(settings, 'STRIPE_SECRET_KEY', '')
+            if stripe_key and stripe_key != 'sk_test_dummy_key' and not stripe_key.startswith('sk_test_dummy'):
+                # Create Stripe Checkout Session
+                checkout_session = stripe.checkout.Session.create(
+                    line_items=[
+                        {
+                            'price_data': {
+                                'currency': 'inr',
+                                'unit_amount': int(show.price * 100),
+                                'product_data': {
+                                    'name': f"{show.movie.title} Ticket(s)",
+                                    'description': f"{show.theater.name} - {show.show_time.strftime('%b %d, %I:%M %p')}",
+                                },
                             },
+                            'quantity': num_seats,
                         },
-                        'quantity': num_seats,
-                    },
-                ],
-                mode='payment',
-                client_reference_id=str(booking.id),
-                customer_email=email,
-                success_url=settings.DOMAIN_URL + '/payment/success/',
-                cancel_url=settings.DOMAIN_URL + '/payment/cancel/',
-                metadata={
-                    'booking_id': booking.id,
-                }
-            )
-            
-            # Save session id to booking
-            booking.stripe_checkout_session_id = checkout_session.id
-            booking.save()
-            checkout_url = checkout_session.url
-        except stripe.error.AuthenticationError:
-            # Fallback to mock checkout if API key is invalid (dummy key)
+                    ],
+                    mode='payment',
+                    client_reference_id=str(booking.id),
+                    customer_email=email,
+                    success_url=settings.DOMAIN_URL + '/payment/success/',
+                    cancel_url=settings.DOMAIN_URL + '/payment/cancel/',
+                    metadata={
+                        'booking_id': booking.id,
+                    }
+                )
+                
+                # Save session id to booking
+                booking.stripe_checkout_session_id = checkout_session.id
+                booking.save()
+                checkout_url = checkout_session.url
+            else:
+                # Fallback to interactive mock checkout when using dummy API key
+                booking.stripe_checkout_session_id = f"mock_session_{booking.id}"
+                booking.save()
+                checkout_url = f"/mock-payment/{booking.id}/"
+        except Exception as e:
+            # Fallback to mock checkout if Stripe API call fails for any reason
             booking.stripe_checkout_session_id = f"mock_session_{booking.id}"
             booking.save()
             checkout_url = f"/mock-payment/{booking.id}/"
@@ -225,18 +290,13 @@ def stripe_webhook_api(request):
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
     except ValueError as e:
-        # Invalid payload
         return HttpResponse(status=400)
     except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
         return HttpResponse(status=400)
 
-    # Idempotency check
     if StripeEvent.objects.filter(event_id=event.id).exists():
-        # Event already processed, return 200 to acknowledge
         return HttpResponse(status=200)
 
-    # Store event for idempotency
     StripeEvent.objects.create(event_id=event.id, event_type=event.type)
 
     if event.type == 'checkout.session.completed':
@@ -247,10 +307,17 @@ def stripe_webhook_api(request):
             booking = Booking.objects.get(id=booking_id)
             if booking.status != 'SUCCESS':
                 booking.status = 'SUCCESS'
-                # Use payment intent or session id as our payment_id
                 booking.payment_id = session.payment_intent or session.id
                 booking.save()
                 
+                # Convert seat locks to CONVERTED
+                seat_list = [s.strip() for s in booking.seat_numbers.split(',') if s.strip()]
+                SeatLock.objects.filter(
+                    show=booking.show,
+                    seat_number__in=[s.upper() for s in seat_list],
+                    status='LOCKED'
+                ).update(status='CONVERTED')
+
                 # Enqueue Email
                 from .email_queue import enqueue_email
                 context_data = {
@@ -292,6 +359,7 @@ def payment_success(request):
 def payment_cancel(request):
     return render(request, 'movies/payment_cancel.html')
 
+@csrf_exempt
 def mock_payment(request, booking_id):
     booking = get_object_or_404(Booking, id=booking_id)
     if request.method == 'POST':
@@ -300,6 +368,14 @@ def mock_payment(request, booking_id):
             booking.status = 'SUCCESS'
             booking.payment_id = f"pi_mock_{booking.id}"
             booking.save()
+
+            # Convert seat locks to CONVERTED
+            seat_list = [s.strip() for s in booking.seat_numbers.split(',') if s.strip()]
+            SeatLock.objects.filter(
+                show=booking.show,
+                seat_number__in=[s.upper() for s in seat_list],
+                status='LOCKED'
+            ).update(status='CONVERTED')
             
             from .email_queue import enqueue_email
             context_data = {
@@ -368,4 +444,46 @@ def movie_detail(request, movie_id):
         'has_trailer': bool(video_id),
     }
     return render(request, 'movies/movie_detail.html', context)
+
+
+def admin_login_view(request):
+    if request.user.is_authenticated and request.user.is_staff:
+        return redirect('admin_dashboard')
+
+    error_message = None
+    if request.method == 'POST':
+        username_input = request.POST.get('username', '').strip()
+        password_input = request.POST.get('password', '').strip()
+
+        user = authenticate(request, username=username_input, password=password_input)
+        if user is not None and user.is_staff:
+            login(request, user)
+            return redirect('admin_dashboard')
+        else:
+            error_message = "Invalid admin credentials or insufficient privileges."
+
+    return render(request, 'movies/admin_login.html', {'error_message': error_message})
+
+
+def admin_logout_view(request):
+    logout(request)
+    return redirect('admin_login')
+
+
+def admin_dashboard_view(request):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return redirect('admin_login')
+
+    analytics_data = get_admin_analytics_data()
+    return render(request, 'movies/admin_dashboard.html', {'analytics': analytics_data})
+
+
+def admin_analytics_api(request):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return JsonResponse({'status': 'error', 'message': 'Unauthorized: Admin access required'}, status=403)
+
+    bypass_cache = request.GET.get('refresh', 'false').lower() == 'true'
+    data = get_admin_analytics_data(bypass_cache=bypass_cache)
+    return JsonResponse({'status': 'success', 'data': data})
+
 

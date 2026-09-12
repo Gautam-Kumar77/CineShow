@@ -71,7 +71,13 @@ class Booking(models.Model):
     payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     stripe_checkout_session_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['show', 'status']),
+        ]
 
     def __str__(self):
         return f"Booking {self.id} for {self.email} - {self.show.movie.title}"
@@ -104,3 +110,29 @@ class StripeEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} - {self.event_id}"
+
+
+class SeatLock(models.Model):
+    STATUS_CHOICES = [
+        ('LOCKED', 'Locked'),
+        ('CONVERTED', 'Converted to Booking'),
+        ('RELEASED', 'Released'),
+        ('EXPIRED', 'Expired'),
+    ]
+
+    show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='seat_locks')
+    seat_number = models.CharField(max_length=20, db_index=True)
+    session_id = models.CharField(max_length=255, db_index=True)
+    locked_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='LOCKED', db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['show', 'seat_number', 'status']),
+            models.Index(fields=['expires_at', 'status']),
+        ]
+
+    def __str__(self):
+        return f"Seat {self.seat_number} for Show {self.show_id} ({self.status})"
+

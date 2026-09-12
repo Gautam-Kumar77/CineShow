@@ -494,6 +494,21 @@
             border-color: var(--primary);
         }
 
+        .seat.locked-by-other {
+            background-color: rgba(245, 158, 11, 0.25);
+            border-color: rgba(245, 158, 11, 0.6);
+            color: #fbbf24;
+            cursor: not-allowed;
+        }
+
+        .seat.booked {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+
         .seat-sample {
             display: inline-block;
             width: 14px;
@@ -505,13 +520,16 @@
 
         .seat-sample.available { background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
         .seat-sample.selected { background-color: var(--primary); }
+        .seat-sample.locked-by-other { background-color: rgba(245, 158, 11, 0.5); border: 1px solid rgba(245, 158, 11, 0.8); }
+        .seat-sample.booked { background-color: rgba(255, 255, 255, 0.15); }
 
         .seat-legend {
             display: flex;
-            gap: 15px;
-            font-size: 12px;
+            gap: 12px;
+            font-size: 11px;
             color: var(--text-muted);
             justify-content: center;
+            flex-wrap: wrap;
         }
 
         .booking-summary-box {
@@ -524,6 +542,27 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+        }
+
+        .lock-timer-box {
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            color: #fbbf24;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { border-color: rgba(245, 158, 11, 0.35); }
+            50% { border-color: rgba(245, 158, 11, 0.8); }
         }
     </style>
 </head>
@@ -646,13 +685,20 @@
                         </div>
                         <div class="seat-legend">
                             <div><span class="seat-sample available"></span> Available</div>
-                            <div><span class="seat-sample selected"></span> Selected</div>
+                            <div><span class="seat-sample selected"></span> Selected (Locked by You)</div>
+                            <div><span class="seat-sample locked-by-other"></span> Locked by Others</div>
+                            <div><span class="seat-sample booked"></span> Booked</div>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="booking-email">Confirm Email Address</label>
                         <input type="email" id="booking-email" class="form-control" placeholder="your-email@example.com" required>
+                    </div>
+
+                    <div id="lock-timer-box" class="lock-timer-box" style="display: none;">
+                        <i class="fa-solid fa-clock"></i>
+                        <span>Temporary Lock: <strong id="lock-timer-display">02:00</strong> remaining</span>
                     </div>
 
                     <div class="booking-summary-box">
@@ -696,34 +742,39 @@
             const container = document.getElementById('trailer-facade-container');
             if (!container) return;
 
-            // XSS Prevention: Clean & reconstruct iframe element carefully
-            // Since videoId has been verified strictly on the server-side as an 11-character token,
-            // we can safely inject it here without risking arbitrary attribute/script injections.
             const iframe = document.createElement('iframe');
             iframe.className = 'trailer-iframe';
-            
-            // Apply standard autoplay parameter to start playback immediately upon user click
             iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
             iframe.title = "YouTube Movie Trailer";
             iframe.frameBorder = "0";
             iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
             iframe.allowFullscreen = true;
-            
-            // Security Constraints: Iframe Sandbox and Referrer policies
             iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox');
             iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
             iframe.setAttribute('loading', 'lazy');
 
-            // Replace facade thumbnail/play button with the iframe
             const wrapper = container.parentElement;
             wrapper.innerHTML = '';
             wrapper.appendChild(iframe);
         }
 
-        // Booking Functionality
+        // Concurrency & Seat Locking State Management
         let currentShowPrice = 0;
         let selectedSeats = [];
         let showsDataList = [];
+        let currentShowId = null;
+        let lockTimerInterval = null;
+        let seatPollInterval = null;
+        let lockExpiresAt = null;
+
+        function getSessionId() {
+            let sid = sessionStorage.getItem('cineshow_session_id');
+            if (!sid) {
+                sid = 'sess_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+                sessionStorage.setItem('cineshow_session_id', sid);
+            }
+            return sid;
+        }
 
         function openBookingModal(movieId, movieTitle) {
             document.getElementById('modal-movie-title').innerText = `Book Tickets: ${movieTitle}`;
@@ -754,54 +805,200 @@
         }
 
         function closeBookingModal() {
+            if (currentShowId && selectedSeats.length > 0) {
+                releaseSeatsOnServer(currentShowId, selectedSeats);
+            }
             document.getElementById('booking-modal').style.display = 'none';
             selectedSeats = [];
             currentShowPrice = 0;
+            currentShowId = null;
+            stopLockTimer();
+            stopSeatPolling();
         }
 
         function onShowSelected() {
             const showId = document.getElementById('show-select').value;
             const detailsSection = document.getElementById('booking-details-section');
             
+            if (currentShowId && selectedSeats.length > 0) {
+                releaseSeatsOnServer(currentShowId, selectedSeats);
+            }
+            
+            stopLockTimer();
+            stopSeatPolling();
+
             if (!showId) {
                 detailsSection.style.display = 'none';
+                currentShowId = null;
                 return;
             }
 
+            currentShowId = showId;
             const selectedShow = showsDataList.find(s => s.id == showId);
             currentShowPrice = selectedShow.price;
             selectedSeats = [];
             
-            // Build interactive seat grid
-            const seatGrid = document.getElementById('seat-grid');
-            seatGrid.innerHTML = '';
-            
-            const rows = ['A', 'B', 'C', 'D'];
-            for (let r = 0; r < rows.length; r++) {
-                for (let c = 1; c <= 8; c++) {
-                    const seatId = `${rows[r]}${c}`;
-                    const seatEl = document.createElement('div');
-                    seatEl.className = 'seat';
-                    seatEl.innerText = seatId;
-                    seatEl.onclick = () => toggleSeatSelection(seatId, seatEl);
-                    seatGrid.appendChild(seatEl);
-                }
-            }
-
-            updateSummary();
             detailsSection.style.display = 'block';
+            fetchAndRenderSeats();
+            
+            // Poll seat status every 3 seconds for real-time concurrency updates
+            seatPollInterval = setInterval(fetchAndRenderSeats, 3000);
         }
 
-        function toggleSeatSelection(seatId, element) {
-            const index = selectedSeats.indexOf(seatId);
-            if (index > -1) {
-                selectedSeats.splice(index, 1);
-                element.classList.remove('selected');
-            } else {
-                selectedSeats.push(seatId);
-                element.classList.add('selected');
-            }
+        function fetchAndRenderSeats() {
+            if (!currentShowId) return;
+            const sessionId = getSessionId();
+
+            fetch(`/api/shows/${currentShowId}/seats/?session_id=${encodeURIComponent(sessionId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        renderSeatGrid(data.seats);
+                    }
+                })
+                .catch(err => console.error('Error fetching seat statuses:', err));
+        }
+
+        function renderSeatGrid(seatsData) {
+            const seatGrid = document.getElementById('seat-grid');
+            seatGrid.innerHTML = '';
+
+            seatsData.forEach(seat => {
+                const seatEl = document.createElement('div');
+                seatEl.className = 'seat';
+                seatEl.innerText = seat.seat_number;
+
+                if (seat.status === 'booked') {
+                    seatEl.classList.add('booked');
+                    seatEl.title = 'Booked';
+                } else if (seat.status === 'locked_by_other') {
+                    seatEl.classList.add('locked-by-other');
+                    const remSec = seat.lock_info ? seat.lock_info.seconds_remaining : 0;
+                    seatEl.title = `Temporarily locked by another user (${remSec}s remaining)`;
+                } else if (seat.status === 'locked_by_me' || selectedSeats.includes(seat.seat_number)) {
+                    seatEl.classList.add('selected');
+                    if (!selectedSeats.includes(seat.seat_number)) {
+                        selectedSeats.push(seat.seat_number);
+                    }
+                    if (seat.lock_info && seat.lock_info.seconds_remaining > 0) {
+                        const newExpiry = Date.now() + (seat.lock_info.seconds_remaining * 1000);
+                        if (!lockExpiresAt || newExpiry > lockExpiresAt) {
+                            lockExpiresAt = newExpiry;
+                            startLockTimer();
+                        }
+                    }
+                }
+
+                if (seat.status === 'available' || seat.status === 'locked_by_me') {
+                    seatEl.onclick = () => toggleSeat(seat.seat_number, seat.status);
+                }
+
+                seatGrid.appendChild(seatEl);
+            });
+
             updateSummary();
+        }
+
+        function toggleSeat(seatId, currentStatus) {
+            const index = selectedSeats.indexOf(seatId);
+            const sessionId = getSessionId();
+
+            if (index > -1) {
+                // Deselect & release seat lock
+                selectedSeats.splice(index, 1);
+                releaseSeatsOnServer(currentShowId, [seatId]);
+                if (selectedSeats.length === 0) {
+                    stopLockTimer();
+                }
+                fetchAndRenderSeats();
+            } else {
+                // Attempt atomic lock reservation on server
+                fetch(`/api/shows/${currentShowId}/lock-seats/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seats: [seatId],
+                        session_id: sessionId
+                    })
+                })
+                .then(res => res.json().then(data => ({ status: res.status, data })))
+                .then(({ status, data }) => {
+                    if (status === 200 && data.status === 'success') {
+                        if (!selectedSeats.includes(seatId)) {
+                            selectedSeats.push(seatId);
+                        }
+                        lockExpiresAt = Date.now() + (data.data.timeout_seconds * 1000);
+                        startLockTimer();
+                        fetchAndRenderSeats();
+                    } else if (status === 409) {
+                        alert(data.message || `Seat ${seatId} is temporarily locked by another user.`);
+                        fetchAndRenderSeats();
+                    } else {
+                        alert('Could not lock seat: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    alert('Network error while reserving seat.');
+                });
+            }
+        }
+
+        function releaseSeatsOnServer(showId, seatsList) {
+            if (!showId || !seatsList || seatsList.length === 0) return;
+            const sessionId = getSessionId();
+            
+            fetch(`/api/shows/${showId}/release-seats/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    seats: seatsList,
+                    session_id: sessionId
+                }),
+                keepalive: true
+            }).catch(err => {});
+        }
+
+        function startLockTimer() {
+            stopLockTimer();
+            const timerBox = document.getElementById('lock-timer-box');
+            const timerDisplay = document.getElementById('lock-timer-display');
+            timerBox.style.display = 'flex';
+
+            updateTimerDisplay();
+            lockTimerInterval = setInterval(updateTimerDisplay, 1000);
+
+            function updateTimerDisplay() {
+                if (!lockExpiresAt) return;
+                const rem = Math.max(0, Math.floor((lockExpiresAt - Date.now()) / 1000));
+                
+                const mins = Math.floor(rem / 60).toString().padStart(2, '0');
+                const secs = (rem % 60).toString().padStart(2, '0');
+                timerDisplay.innerText = `${mins}:${secs}`;
+
+                if (rem <= 0) {
+                    stopLockTimer();
+                    selectedSeats = [];
+                    alert('Your 2-minute seat reservation timer has expired. Seats have been unlocked for other users.');
+                    fetchAndRenderSeats();
+                }
+            }
+        }
+
+        function stopLockTimer() {
+            if (lockTimerInterval) {
+                clearInterval(lockTimerInterval);
+                lockTimerInterval = null;
+            }
+            lockExpiresAt = null;
+            const timerBox = document.getElementById('lock-timer-box');
+            if (timerBox) timerBox.style.display = 'none';
+        }
+
+        function stopSeatPolling() {
+            if (seatPollInterval) {
+                clearInterval(seatPollInterval);
+                seatPollInterval = null;
+            }
         }
 
         function updateSummary() {
@@ -816,6 +1013,7 @@
             const showId = document.getElementById('show-select').value;
             const email = document.getElementById('booking-email').value;
             const btn = document.getElementById('confirm-booking-btn');
+            const sessionId = getSessionId();
 
             if (selectedSeats.length === 0) {
                 alert('Please select at least one seat.');
@@ -838,15 +1036,19 @@
                 body: JSON.stringify({
                     show_id: showId,
                     email: email,
-                    seats: selectedSeats.join(', ')
+                    seats: selectedSeats.join(', '),
+                    session_id: sessionId
                 })
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success' && data.checkout_url) {
+            .then(res => res.json().then(data => ({ status: res.status, data })))
+            .then(({ status, data }) => {
+                if (status === 200 && data.status === 'success' && data.checkout_url) {
                     window.location.href = data.checkout_url;
+                } else if (status === 409) {
+                    alert(data.message || 'Seat lock conflict. Please choose available seats.');
+                    fetchAndRenderSeats();
                 } else {
-                    alert('Booking failed: ' + data.message);
+                    alert('Booking failed: ' + (data.message || 'Unknown error'));
                 }
             })
             .catch(err => {
@@ -861,6 +1063,18 @@
         function closeSuccessModal() {
             document.getElementById('success-modal').style.display = 'none';
         }
+
+        // Auto release active seat locks if user closes browser tab or navigates away
+        window.addEventListener('beforeunload', () => {
+            if (currentShowId && selectedSeats.length > 0) {
+                const sessionId = getSessionId();
+                const payload = JSON.stringify({
+                    seats: selectedSeats,
+                    session_id: sessionId
+                });
+                navigator.sendBeacon(`/api/shows/${currentShowId}/release-seats/`, payload);
+            }
+        });
     </script>
 </body>
 

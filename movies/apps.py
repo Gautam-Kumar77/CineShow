@@ -9,3 +9,8 @@ class MoviesConfig(AppConfig):
         from .email_queue import start_worker
         start_worker()
 
+        # Import and start background seat lock cleanup worker thread
+        from .seat_lock_manager import start_lock_cleanup_worker
+        start_lock_cleanup_worker()
+
+
